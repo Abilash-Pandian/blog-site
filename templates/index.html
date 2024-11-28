@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Open Chaos</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: #f9f9f9;
+      }
+      h1 {
+        text-align: center;
+      }
+      .blog-form,
+      .reply-form {
+        margin: 20px auto;
+        max-width: 600px;
+        padding: 20px;
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+      .blog-form textarea,
+      .reply-form textarea {
+        width: 100%;
+        margin-bottom: 10px;
+      }
+      .blog-form button,
+      .reply-form button {
+        width: 100%;
+        padding: 10px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .blogs {
+        max-width: 600px;
+        margin: 20px auto;
+      }
+      .blog {
+        padding: 15px;
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+      .blog img {
+        max-width: 100%;
+        margin-top: 10px;
+      }
+      .replies {
+        margin-top: 10px;
+        padding-left: 20px;
+        border-left: 2px solid #ddd;
+      }
+      .reply {
+        margin-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Open Chaos</h1>
+    <form class="blog-form" id="blogForm">
+      <textarea
+        name="content"
+        placeholder="Write your blog..."
+        required
+      ></textarea
+      ><br />
+      <input type="file" name="image" accept="image/*" /><br />
+      <button type="submit">Post Blog</button>
+    </form>
+    <div class="blogs" id="blogsContainer"></div>
+
+    <script>
+      const username =
+        localStorage.getItem("username") ||
+        `User_${Math.floor(Math.random() * 10000)}`;
+      localStorage.setItem("username", username);
+
+      async function fetchBlogs() {
+        const response = await fetch("/blogs");
+        const blogs = await response.json();
+
+        const container = document.getElementById("blogsContainer");
+        container.innerHTML = "";
+
+        blogs.forEach((blog) => {
+          const blogDiv = document.createElement("div");
+          blogDiv.className = "blog";
+
+          const replies = blog.replies
+            .map(
+              (reply) => `
+                    <div class="reply">
+                        <strong>${reply.username}:</strong> ${reply.content}
+                    </div>
+                `
+            )
+            .join("");
+
+          blogDiv.innerHTML = `
+                    <p><strong>${blog.username}</strong>: ${
+            blog.content || ""
+          }</p>
+                    ${
+                      blog.image
+                        ? `<img src="/images/${blog.image}" alt="Blog Image">`
+                        : ""
+                    }
+                    <div class="replies">${replies}</div>
+                    <form class="reply-form" onsubmit="postReply(event, '${
+                      blog.id
+                    }')">
+                        <textarea placeholder="Write a reply..." required></textarea>
+                        <button type="submit">Reply</button>
+                    </form>
+                `;
+
+          container.appendChild(blogDiv);
+        });
+      }
+
+      async function postBlog(event) {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+        formData.append("username", username);
+
+        await fetch("/blogs", {
+          method: "POST",
+          body: formData,
+        });
+
+        event.target.reset();
+        fetchBlogs();
+      }
+
+      async function postReply(event, blogId) {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+        formData.append("username", username);
+
+        await fetch(`/blogs/${blogId}/reply`, {
+          method: "POST",
+          body: formData,
+        });
+
+        event.target.reset();
+        fetchBlogs();
+      }
+
+      document.getElementById("blogForm").addEventListener("submit", postBlog);
+      fetchBlogs();
+    </script>
+  </body>
+</html>
