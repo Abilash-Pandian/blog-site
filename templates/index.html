@@ -1,162 +1,138 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<html>
+<head>
     <title>Open Chaos</title>
     <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 20px;
-        background-color: #f9f9f9;
-      }
-      h1 {
-        text-align: center;
-      }
-      .blog-form,
-      .reply-form {
-        margin: 20px auto;
-        max-width: 600px;
-        padding: 20px;
-        background: #fff;
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-      }
-      .blog-form textarea,
-      .reply-form textarea {
-        width: 100%;
-        margin-bottom: 10px;
-      }
-      .blog-form button,
-      .reply-form button {
-        width: 100%;
-        padding: 10px;
-        background-color: #007bff;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-      .blogs {
-        max-width: 600px;
-        margin: 20px auto;
-      }
-      .blog {
-        padding: 15px;
-        background: #fff;
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        margin-bottom: 15px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-      }
-      .blog img {
-        max-width: 100%;
-        margin-top: 10px;
-      }
-      .replies {
-        margin-top: 10px;
-        padding-left: 20px;
-        border-left: 2px solid #ddd;
-      }
-      .reply {
-        margin-bottom: 10px;
-      }
+        .blog-post {
+            border: 1px solid #ddd;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .replies {
+            margin-left: 20px;
+            border-left: 2px solid #ddd;
+            padding-left: 10px;
+        }
+        .reply {
+            margin: 5px 0;
+            padding: 5px;
+            background-color: #f9f9f9;
+        }
     </style>
-  </head>
-  <body>
+</head>
+<body>
     <h1>Open Chaos</h1>
-    <form class="blog-form" id="blogForm">
-      <textarea
-        name="content"
-        placeholder="Write your blog..."
-        required
-      ></textarea
-      ><br />
-      <input type="file" name="image" accept="image/*" /><br />
-      <button type="submit">Post Blog</button>
-    </form>
-    <div class="blogs" id="blogsContainer"></div>
+
+    <div>
+        <h3>Post Blog</h3>
+        <form id="blogForm">
+            <input type="text" id="username" placeholder="Your name" required><br>
+            <textarea id="content" placeholder="Your message" required></textarea><br>
+            <input type="file" id="image" accept="image/*"><br>
+            <button type="submit">Post</button>
+        </form>
+    </div>
+
+    <div id="blogsContainer"></div>
 
     <script>
-      const username =
-        localStorage.getItem("username") ||
-        `User_${Math.floor(Math.random() * 10000)}`;
-      localStorage.setItem("username", username);
+        // Function to create a reply form
+        function createReplyForm(blogId) {
+            return `
+                <form onsubmit="handleReply(event, '${blogId}')" class="reply-form">
+                    <input type="text" placeholder="Your name" required class="reply-username">
+                    <input type="text" placeholder="Your reply" required class="reply-content">
+                    <button type="submit">Reply</button>
+                </form>
+            `;
+        }
 
-      async function fetchBlogs() {
-        const response = await fetch("/blogs");
-        const blogs = await response.json();
-
-        const container = document.getElementById("blogsContainer");
-        container.innerHTML = "";
-
-        blogs.forEach((blog) => {
-          const blogDiv = document.createElement("div");
-          blogDiv.className = "blog";
-
-          const replies = blog.replies
-            .map(
-              (reply) => `
-                    <div class="reply">
-                        <strong>${reply.username}:</strong> ${reply.content}
+        // Function to display blogs and their replies
+        function displayBlogs(blogs) {
+            const container = document.getElementById('blogsContainer');
+            container.innerHTML = blogs.map(blog => `
+                <div class="blog-post">
+                    <strong>${blog.username}</strong>: ${blog.content}
+                    ${blog.image ? `<br><img src="/images/${blog.image}" style="max-width: 200px;">` : ''}
+                    <div class="replies">
+                        ${blog.replies.map(reply => `
+                            <div class="reply">
+                                <strong>${reply.username}</strong>: ${reply.content}
+                            </div>
+                        `).join('')}
+                        ${createReplyForm(blog.id)}
                     </div>
-                `
-            )
-            .join("");
+                </div>
+            `).join('');
+        }
 
-          blogDiv.innerHTML = `
-                    <p><strong>${blog.username}</strong>: ${
-            blog.content || ""
-          }</p>
-                    ${
-                      blog.image
-                        ? `<img src="/images/${blog.image}" alt="Blog Image">`
-                        : ""
-                    }
-                    <div class="replies">${replies}</div>
-                    <form class="reply-form" onsubmit="postReply(event, '${
-                      blog.id
-                    }')">
-                        <textarea placeholder="Write a reply..." required></textarea>
-                        <button type="submit">Reply</button>
-                    </form>
-                `;
+        // Function to fetch blogs
+        async function fetchBlogs() {
+            try {
+                const response = await fetch('/blogs');
+                const blogs = await response.json();
+                displayBlogs(blogs);
+            } catch (error) {
+                console.error('Error fetching blogs:', error);
+            }
+        }
 
-          container.appendChild(blogDiv);
-        });
-      }
+        // Function to handle new blog posts
+        async function handlePost(event) {
+            event.preventDefault();
+            const formData = new FormData();
+            formData.append('username', document.getElementById('username').value);
+            formData.append('content', document.getElementById('content').value);
+            
+            const imageFile = document.getElementById('image').files[0];
+            if (imageFile) {
+                formData.append('image', imageFile);
+            }
 
-      async function postBlog(event) {
-        event.preventDefault();
-        const formData = new FormData(event.target);
-        formData.append("username", username);
+            try {
+                await fetch('/blogs', {
+                    method: 'POST',
+                    body: formData
+                });
+                document.getElementById('content').value = '';
+                document.getElementById('image').value = '';
+                fetchBlogs();
+            } catch (error) {
+                console.error('Error posting blog:', error);
+            }
+        }
 
-        await fetch("/blogs", {
-          method: "POST",
-          body: formData,
-        });
+        // Function to handle replies
+        async function handleReply(event, blogId) {
+            event.preventDefault();
+            const form = event.target;
+            const username = form.querySelector('.reply-username').value;
+            const content = form.querySelector('.reply-content').value;
 
-        event.target.reset();
+            try {
+                await fetch(`/blogs/${blogId}/reply`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `username=${encodeURIComponent(username)}&content=${encodeURIComponent(content)}`
+                });
+                form.reset();
+                fetchBlogs();
+            } catch (error) {
+                console.error('Error posting reply:', error);
+            }
+        }
+
+        // Set up form submission handler
+        document.getElementById('blogForm').onsubmit = handlePost;
+
+        // Initial fetch
         fetchBlogs();
-      }
 
-      async function postReply(event, blogId) {
-        event.preventDefault();
-        const formData = new FormData(event.target);
-        formData.append("username", username);
-
-        await fetch(`/blogs/${blogId}/reply`, {
-          method: "POST",
-          body: formData,
-        });
-
-        event.target.reset();
-        fetchBlogs();
-      }
-
-      document.getElementById("blogForm").addEventListener("submit", postBlog);
-      fetchBlogs();
+        // Set up polling for updates every 2 seconds
+        setInterval(fetchBlogs, 2000);
     </script>
-  </body>
+</body>
 </html>
