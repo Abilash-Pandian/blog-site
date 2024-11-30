@@ -3,8 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Blog Site</title>
-    <link rel="stylesheet" href="/static/style.css" />
+    <title>AJAX Blog Site</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .blog {
+        border: 1px solid #ddd;
+        padding: 10px;
+        margin-bottom: 20px;
+      }
+      .replies {
+        margin-top: 10px;
+        padding-left: 20px;
+        border-left: 2px solid #ddd;
+      }
+      .reply-box {
+        width: 100%;
+        margin-top: 10px;
+      }
+    </style>
   </head>
   <body>
     <h1>Welcome to the Blog Site</h1>
@@ -24,94 +43,110 @@
       const username = "{{ username }}";
       document.getElementById("username").textContent = username;
 
+      // Fetch blogs periodically
+      setInterval(fetchBlogs, 5000); // Poll every 5 seconds
+
+      function fetchBlogs() {
+        fetch("/get_blogs")
+          .then((response) => response.json())
+          .then((blogs) => updateBlogContainer(blogs));
+      }
+
       async function postBlog() {
         const content = document.getElementById("blog-content").value;
-        const image = document.getElementById("blog-image").files[0];
+        const imageInput = document.getElementById("blog-image").files[0];
 
         let imageData = "";
-        if (image) {
+        if (imageInput) {
           const reader = new FileReader();
           reader.onloadend = () => {
             imageData = reader.result;
             sendBlog(content, imageData);
           };
-          reader.readAsDataURL(image);
+          reader.readAsDataURL(imageInput);
         } else {
           sendBlog(content, "");
         }
       }
 
-      async function sendBlog(content, image) {
-        const response = await fetch("/post_blog", {
+      function sendBlog(content, image) {
+        fetch("/post_blog", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ author: username, content, image }),
-        });
-        const data = await response.json();
-        if (data.status === "success") {
-          alert("Blog posted!");
-          fetchBlogs();
-        } else {
-          alert("Error posting blog.");
-        }
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success) {
+              fetchBlogs(); // Immediately refresh blogs
+            }
+          });
       }
 
-      async function fetchBlogs() {
-        const response = await fetch("/get_blogs");
-        const blogs = await response.json();
-
-        const container = document.getElementById("blogs-container");
-        container.innerHTML = "";
-
-        for (const [id, blog] of Object.entries(blogs)) {
-          const blogElement = document.createElement("div");
-          blogElement.className = "blog";
-          blogElement.innerHTML = `
-                    <h3>${blog.author}</h3>
-                    <p>${blog.content}</p>
-                    ${
-                      blog.image
-                        ? `<img src="${blog.image}" alt="Blog Image" style="max-width: 200px;">`
-                        : ""
-                    }
-                    <div class="replies"></div>
-                    <textarea placeholder="Reply..." class="reply-box"></textarea>
-                    <button onclick="postReply('${id}', this.previousElementSibling.value)">Reply</button>
-                `;
-          container.appendChild(blogElement);
-
-          const repliesContainer = blogElement.querySelector(".replies");
-          for (const reply of blog.replies) {
-            const replyElement = document.createElement("div");
-            replyElement.className = "reply";
-            replyElement.innerHTML = `
-                        <strong>${reply.author}</strong>: ${reply.content}
-                    `;
-            repliesContainer.appendChild(replyElement);
-          }
-        }
-      }
-
-      async function postReply(blogId, content) {
-        const response = await fetch("/reply", {
+      function postReply(blogId, replyContent) {
+        fetch("/post_reply", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ blog_id: blogId, author: username, content }),
-        });
-        const data = await response.json();
-        if (data.status === "success") {
-          alert("Reply posted!");
-          fetchBlogs();
-        } else {
-          alert("Error posting reply.");
+          body: JSON.stringify({
+            blog_id: blogId,
+            author: username,
+            content: replyContent,
+          }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success) {
+              fetchBlogs(); // Immediately refresh blogs
+            }
+          });
+      }
+
+      function updateBlogContainer(blogs) {
+        const container = document.getElementById("blogs-container");
+        container.innerHTML = "";
+
+        for (const [id, blog] of Object.entries(blogs)) {
+          addBlogToContainer(id, blog);
         }
       }
 
-      // Fetch blogs on page load
+      function addBlogToContainer(blogId, blog) {
+        const container = document.getElementById("blogs-container");
+
+        const blogElement = document.createElement("div");
+        blogElement.className = "blog";
+        blogElement.innerHTML = `
+                <h3>${blog.author}</h3>
+                <p>${blog.content}</p>
+                ${
+                  blog.image
+                    ? `<img src="${blog.image}" alt="Blog Image" style="max-width: 200px;">`
+                    : ""
+                }
+                <div class="replies" id="replies-${blogId}"></div>
+                <textarea placeholder="Reply..." class="reply-box"></textarea>
+                <button onclick="postReply('${blogId}', this.previousElementSibling.value)">Reply</button>
+            `;
+        container.appendChild(blogElement);
+
+        for (const reply of blog.replies) {
+          addReplyToBlog(blogId, reply);
+        }
+      }
+
+      function addReplyToBlog(blogId, reply) {
+        const repliesContainer = document.getElementById(`replies-${blogId}`);
+        const replyElement = document.createElement("div");
+        replyElement.className = "reply";
+        replyElement.innerHTML = `<strong>${reply.author}</strong>: ${reply.content}`;
+        repliesContainer.appendChild(replyElement);
+      }
+
+      // Fetch blogs when the page loads
       fetchBlogs();
     </script>
   </body>
